@@ -21,12 +21,80 @@ namespace API
 {
     namespace Constants
     {
-        std::string apiUrl = "http://localhost:9000/api/";
+        std::string apiUrl = "https://blitzware-api-production.up.railway.app/api/";
         bool initialized = false;
         bool started = false;
         bool breached = false;
         auto timeSent = std::chrono::system_clock::now();
     };
+
+    std::string exec(const char* cmd) {
+        std::array<char, 128> buffer{};
+        std::string result;
+        //#ifdef OS_WINDOWS
+        std::unique_ptr<FILE, decltype(&_pclose)> pipe(_popen(cmd, "r"), _pclose);
+        //#else
+        //std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
+        //#endif
+        if (!pipe) {
+            throw std::runtime_error("popen() failed!");
+        }
+        while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+            result += buffer.data();
+        }
+        return result;
+    }
+
+    std::vector<std::string> split(const std::string& str,
+        const std::string& delimiter) {
+        std::vector<std::string> output;
+        std::string s = str;
+
+        size_t pos = 0;
+        std::string token;
+        while ((pos = s.find(delimiter)) != std::string::npos) {
+            token = s.substr(0, pos);
+            output.push_back(token);
+            s.erase(0, pos + delimiter.length());
+        }
+
+        output.push_back(s);
+        return output;
+    }
+
+    std::string strip(const std::string& str,
+        const std::function<bool(const char)>& callback) {
+        auto start_it = str.begin();
+        auto end_it = str.rbegin();
+        while (callback(*start_it) && start_it != end_it.base())
+            ++start_it;
+        while (callback(*end_it) && start_it != end_it.base())
+            ++end_it;
+        return std::string(start_it, end_it.base());
+    }
+
+    std::string HWID() {
+        std::string hwid;
+
+        //#ifdef OS_WINDOWS
+        hwid = split(exec("wmic csproduct get uuid"), "\n")[1];
+        //#else
+        //hwid = exec("dmidecode -s system-uuid");
+        //#endif
+
+        return strip(hwid, [](const char c) { return std::isspace(c); });
+    }
+
+    std::string IP() {
+        auto response = cpr::Get // or cpr::Head
+        (
+            cpr::Url{ "http://icanhazip.com" },
+            cpr::Header{ {"accept", "text/html"} },
+            cpr::Timeout{ 4 * 1000 }
+        );
+        return response.text;
+    }
+
     namespace ApplicationSettings
     {
         //werkt
@@ -191,6 +259,7 @@ namespace API
                 }
                 else
                 {
+                    content = json::json::parse(response.text);
                     if (response.status_code == 0)
                     {
                         MessageBox(NULL, L"Unable to connect to the remote server!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
@@ -231,6 +300,8 @@ namespace API
             json::json UserLoginDetails;
             UserLoginDetails["username"] = username;
             UserLoginDetails["password"] = password;
+            UserLoginDetails["hwid"] = HWID();
+            UserLoginDetails["lastIP"] = IP();
             auto response = cpr::Post(cpr::Url{ Constants::apiUrl + "users/login" },
                 cpr::Body{ UserLoginDetails.dump() },
                 cpr::Header{ {"Content-Type", "application/json"} });
@@ -322,6 +393,8 @@ namespace API
             UserRegisterDetails["password"] = password;
             UserRegisterDetails["email"] = email;
             UserRegisterDetails["license"] = license;
+            UserRegisterDetails["hwid"] = HWID();
+            UserRegisterDetails["lastIP"] = IP();
             auto response = cpr::Post(cpr::Url{ Constants::apiUrl + "users/register" },
                 cpr::Body{ UserRegisterDetails.dump() },
                 cpr::Header{ {"Content-Type", "application/json"} });
@@ -405,6 +478,7 @@ namespace API
             UserExtendDetails["username"] = username;
             UserExtendDetails["password"] = password;
             UserExtendDetails["license"] = license;
+            UserExtendDetails["hwid"] = HWID();
             auto response = cpr::Put(cpr::Url{ Constants::apiUrl + "users/upgrade" },
                 cpr::Body{ UserExtendDetails.dump() },
                 cpr::Header{ {"Content-Type", "application/json"} });
