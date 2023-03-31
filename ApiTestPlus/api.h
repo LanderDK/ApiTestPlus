@@ -21,7 +21,7 @@ namespace API
 {
     namespace Constants
     {
-        std::string apiUrl = "https://3.120.148.15/api/";
+        std::string apiUrl = "https://api.blitzware.xyz/api/";
         bool initialized = false;
         bool started = false;
         bool breached = false;

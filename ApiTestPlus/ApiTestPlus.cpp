@@ -4,7 +4,7 @@
 
 int main()
 {
-    API::OnProgramStart::Initialize("BlitzWare", "ce025642a01df3bcc9dcddd2bfb423f720174ed450c54e7b4d4085320cefeef0", "1.0");
+    API::OnProgramStart::Initialize("BlitzWare", "b15d1b577a28d6db8526a7b7e4cb9c566b9c7957c9831660eac405ddc3d382a4", "1.0");
 
     std::string option, username, password, email, license;
 
