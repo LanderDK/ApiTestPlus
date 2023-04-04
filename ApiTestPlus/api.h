@@ -9,7 +9,6 @@
 #include <ctime>
 #include "md5.h"
 namespace json = nlohmann;
-namespace fs = std::filesystem;
 #define MSGBOX(x) \
 { \
    std::ostringstream oss; \
@@ -128,7 +127,6 @@ namespace API
     {
         static void Start()
         {
-            std::string drive = fs::current_path().root_path().string();
             if (API::Constants::started)
             {
                 MessageBox(NULL, L"A session has already been started, please end the previous one!", L"ERROR", MB_ICONERROR | MB_OK);
