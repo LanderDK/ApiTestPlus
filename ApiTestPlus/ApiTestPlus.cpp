@@ -4,13 +4,15 @@
 
 int main()
 {
-    API::OnProgramStart::Initialize("BlitzWare", "b15d1b577a28d6db8526a7b7e4cb9c566b9c7957c9831660eac405ddc3d382a4", "1.0");
+    API::OnProgramStart::Initialize("BlitzWare", "64aa5135948x28fa6040b0d6900de77e9a3924e6cee6cc3333c32ff5f8707e8e", "1.0");
 
-    std::string option, username, password, email, license;
+    std::string option, username, password, email;
+    std::string license = "N/A";
 
     std::cout << "\n[1] Login" << std::endl;
     std::cout << "[2] Register" << std::endl;
-    std::cout << "[3] Extend Subscription" << std::endl;
+    if (!API::ApplicationSettings::freeMode)
+        std::cout << "[3] Extend Subscription" << std::endl;
     std::cout << "\nOption:" << std::endl;
     std::cin >> option;
 
@@ -48,8 +50,12 @@ int main()
         std::cin >> password;
         std::cout << "\nEmail: ";
         std::cin >> email;
-        std::cout << "\nLicense: ";
-        std::cin >> license;
+        if (!API::ApplicationSettings::freeMode)
+        {
+            std::cout << "\nLicense: ";
+            std::cin >> license;
+        }
+
         if (API::Register(username, password, email, license))
         {
             MessageBox(NULL, L"Successfully Registered!", API::OnProgramStart::Name, MB_ICONINFORMATION | MB_OK);
@@ -60,23 +66,26 @@ int main()
             exit(0);
         }
     }
-    else if (option == "3")
+    if (!API::ApplicationSettings::freeMode)
     {
-        system("CLS");
-        std::cout << "\nUsername: ";
-        std::cin >> username;
-        std::cout << "\nPassword: ";
-        std::cin >> password;
-        std::cout << "\nLicense: ";
-        std::cin >> license;
-        if (API::ExtendSub(username, password, license))
+        if (option == "3")
         {
-            MessageBox(NULL, L"Successfully Extended Your Subscription!", API::OnProgramStart::Name, MB_ICONINFORMATION | MB_OK);
-            //do code that you want
-        }
-        else
-        {
-            exit(0);
+            system("CLS");
+            std::cout << "\nUsername: ";
+            std::cin >> username;
+            std::cout << "\nPassword: ";
+            std::cin >> password;
+            std::cout << "\nLicense: ";
+            std::cin >> license;
+            if (API::ExtendSub(username, password, license))
+            {
+                MessageBox(NULL, L"Successfully Extended Your Subscription!", API::OnProgramStart::Name, MB_ICONINFORMATION | MB_OK);
+                //do code that you want
+            }
+            else
+            {
+                exit(0);
+            }
         }
     }
 }

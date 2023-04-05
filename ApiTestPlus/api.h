@@ -96,7 +96,7 @@ namespace API
 
     namespace ApplicationSettings
     {
-        //werkt
+        std::string id;
         bool status;
         bool hwidCheck;
         bool developerMode;
@@ -211,6 +211,7 @@ namespace API
                 {
                     content = json::json::parse(response.text);
                     Constants::initialized = true;
+                    ApplicationSettings::id = Utilities::removeQuotesFromString(to_string(content["id"]));
                     ApplicationSettings::status = content["status"] == 1 ? true : false;
                     ApplicationSettings::hwidCheck = content["hwidCheck"] == 1 ? true : false;
                     ApplicationSettings::integrityCheck = content["integrityCheck"] == 1 ? true : false;
@@ -218,6 +219,11 @@ namespace API
                     ApplicationSettings::version = Utilities::removeQuotesFromString(to_string(content["version"]));
                     ApplicationSettings::downloadLink = Utilities::removeQuotesFromString(to_string(content["downloadLink"]));
                     ApplicationSettings::developerMode = content["developerMode"] == 1 ? true : false;
+                    ApplicationSettings::freeMode = content["freeMode"] == 1 ? true : false;
+
+                    if (API::ApplicationSettings::freeMode)
+                        MessageBox(NULL, L"Application is in Free Mode!", OnProgramStart::Name,
+                            MB_ICONINFORMATION | MB_OK);
 
                     if (ApplicationSettings::developerMode)
                     {
@@ -393,6 +399,7 @@ namespace API
             UserRegisterDetails["license"] = license;
             UserRegisterDetails["hwid"] = HWID();
             UserRegisterDetails["lastIP"] = IP();
+            UserRegisterDetails["id"] = ApplicationSettings::id;
             auto response = cpr::Post(cpr::Url{ Constants::apiUrl + "users/register" },
                 cpr::Body{ UserRegisterDetails.dump() },
                 cpr::Header{ {"Content-Type", "application/json"} });
