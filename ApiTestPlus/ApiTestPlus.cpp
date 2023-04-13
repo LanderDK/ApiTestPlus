@@ -4,7 +4,7 @@
 
 int main()
 {
-    API::OnProgramStart::Initialize("BlitzWare", "64aa5135948x28fa6040b0d6900de77e9a3924e6cee6cc3333c32ff5f8707e8e", "1.0");
+    API::OnProgramStart::Initialize("APP NAME", "SECRET", "VERSION");
 
     std::string option, username, password, email;
     std::string license = "N/A";
