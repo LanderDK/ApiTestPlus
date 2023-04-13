@@ -4,7 +4,7 @@
 
 int main()
 {
-    API::OnProgramStart::Initialize("BlitzWare", "64aa5135948x28fa6040b0d6900de77e9a3924e6cee6cc3333c32ff5f8707e8e", "1.0");
+    API::OnProgramStart::Initialize("BlitzWare", "64aa5135948a28fa6040b0d6900de77e9a3924e6cee6cc3333c32ff5f8707e8e", "1.0");
 
     std::string option, username, password, email;
     std::string license = "N/A";
@@ -25,7 +25,7 @@ int main()
         std::cin >> password;
         if (API::Login(username, password))
         {
-            MessageBox(NULL, L"Successfully Logged In!", API::OnProgramStart::Name, MB_ICONINFORMATION | MB_OK);
+            MessageBoxA(NULL, "Successfully Logged In!", API::OnProgramStart::Name, MB_ICONINFORMATION | MB_OK);
             system("CLS");
             std::cout << "\nID: " + API::User::ID << std::endl;
             std::cout << "Username: " + API::User::Username << std::endl;
@@ -58,7 +58,7 @@ int main()
 
         if (API::Register(username, password, email, license))
         {
-            MessageBox(NULL, L"Successfully Registered!", API::OnProgramStart::Name, MB_ICONINFORMATION | MB_OK);
+            MessageBoxA(NULL, "Successfully Registered!", API::OnProgramStart::Name, MB_ICONINFORMATION | MB_OK);
             //do code that you want
         }
         else
@@ -79,7 +79,7 @@ int main()
             std::cin >> license;
             if (API::ExtendSub(username, password, license))
             {
-                MessageBox(NULL, L"Successfully Extended Your Subscription!", API::OnProgramStart::Name, MB_ICONINFORMATION | MB_OK);
+                MessageBoxA(NULL, "Successfully Extended Your Subscription!", API::OnProgramStart::Name, MB_ICONINFORMATION | MB_OK);
                 //do code that you want
             }
             else

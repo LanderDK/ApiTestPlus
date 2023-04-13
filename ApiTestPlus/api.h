@@ -7,14 +7,17 @@
 #include <iostream>
 #include <chrono>
 #include <ctime>
-#include "md5.h"
+#include <fstream>
+#include <algorithm>
+#include <Windows.h>
+#include <cstdio>
+#include <cstdlib>
+#include <iomanip>
+#include <sstream>
+#include <ctime>
+#include <openssl/md5.h>
 namespace json = nlohmann;
-#define MSGBOX(x) \
-{ \
-   std::ostringstream oss; \
-   oss << x; \
-   MessageBox(oss.str().c_str(), "Msg Title", MB_OK | MB_ICONQUESTION); \
-}
+using namespace std;
 
 namespace API
 {
@@ -24,7 +27,7 @@ namespace API
         bool initialized = false;
         bool started = false;
         bool breached = false;
-        auto timeSent = std::chrono::system_clock::now();
+        auto timeSent = time(NULL);
     };
 
     std::string exec(const char* cmd) {
@@ -123,67 +126,87 @@ namespace API
         std::string RegisterDate;
     };
 
-    namespace Security
-    {
-        static void Start()
-        {
-            if (API::Constants::started)
-            {
-                MessageBox(NULL, L"A session has already been started, please end the previous one!", L"ERROR", MB_ICONERROR | MB_OK);
-                exit(0);
+    class Security {
+    public:
+        static void Start() {
+            char drive[MAX_PATH];
+            _splitpath_s(getenv("SystemRoot"), NULL, 0, drive, MAX_PATH, NULL, 0, NULL, 0);
+
+            if (Constants::started) {
+                MessageBoxA(NULL, "A session has already been started, please end the previous one!", "Security", MB_OK | MB_ICONWARNING);
+                ExitProcess(0);
             }
-            else
-            {
-                API::Constants::started = true;
+            else {
+                string hosts_path = drive;
+                hosts_path += "Windows\\System32\\drivers\\etc\\hosts";
+                ifstream hosts_file(hosts_path.c_str());
+
+                if (hosts_file.is_open()) {
+                    string contents((istreambuf_iterator<char>(hosts_file)), istreambuf_iterator<char>());
+                    if (contents.find("api.blitzware.xyz") != string::npos) {
+                        Constants::breached = true;
+                        MessageBoxA(NULL, "DNS redirecting has been detected!", "Security", MB_OK | MB_ICONERROR);
+                        ExitProcess(0);
+                    }
+                }
+                Constants::started = true;
             }
         }
 
-        static void End()
-        {
-            if (!API::Constants::started)
-            {
-                MessageBox(NULL, L"No session has been started, closing for security reasons!", L"ERROR", MB_ICONERROR | MB_OK);
-                exit(0);
+        static void End() {
+            if (!Constants::started) {
+                MessageBoxA(NULL, "No session has been started, closing for security reasons!", "Security", MB_OK | MB_ICONWARNING);
+                ExitProcess(0);
             }
-            else
-            {
-                API::Constants::started = false;
+            else {
+                Constants::started = false;
             }
         }
 
-        static std::string Integrity(std::string filename)
-        {
-            std::string result = md5(filename);
+        static string Integrity(const char* filename) {
+            string result;
+            ifstream file(filename, ios::binary);
+
+            if (file.is_open()) {
+                file.seekg(0, ios::end);
+                streampos size = file.tellg();
+                char* buffer = new char[size];
+                file.seekg(0, ios::beg);
+                file.read(buffer, size);
+                file.close();
+
+                unsigned char hash[MD5_DIGEST_LENGTH];
+                MD5((unsigned char*)buffer, size, hash);
+
+                stringstream ss;
+                for (int i = 0; i < MD5_DIGEST_LENGTH; i++) {
+                    ss << setfill('0') << setw(2) << hex << (int)hash[i];
+                }
+                result = ss.str();
+                delete[] buffer;
+            }
             return result;
         }
 
-        static bool MaliciousCheck(std::chrono::system_clock::time_point date)
-        {
-            auto start = date; //time sent
-            auto end = std::chrono::system_clock::now(); //time recieved
-            std::chrono::duration<double> elapsed_seconds = end - start;
-            typedef std::chrono::duration<float> float_seconds;
-            auto secs = std::chrono::duration_cast<float_seconds>(elapsed_seconds);
-            if (elapsed_seconds.count() >= 5.0)
-            {
+        static bool MaliciousCheck(time_t date) {
+            time_t t = time(NULL);
+            double diff = difftime(t, date);
+            if (diff >= 5 || abs(diff) >= 60) {
                 Constants::breached = true;
                 return true;
             }
-            else
-            {
+            else {
                 return false;
             }
         }
-    }
+    };
 
     namespace OnProgramStart
     {
-        LPCWSTR Name;
+        LPCSTR Name;
 
         void Initialize(std::string name, std::string secret, std::string version)
         {
-            std::wstring nameNotConverted = std::wstring(name.begin(), name.end());
-            Name = nameNotConverted.c_str();
             try
             {
                 Security::Start();
@@ -198,12 +221,12 @@ namespace API
 
                 if (Security::MaliciousCheck(Constants::timeSent))
                 {
-                    MessageBox(NULL, L"Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                    MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
                     exit(0);
                 }
                 if (Constants::breached)
                 {
-                    MessageBox(NULL, L"Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                    MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
                     exit(0);
                 }
 
@@ -222,33 +245,55 @@ namespace API
                     ApplicationSettings::freeMode = content["freeMode"] == 1 ? true : false;
 
                     if (API::ApplicationSettings::freeMode)
-                        MessageBox(NULL, L"Application is in Free Mode!", OnProgramStart::Name,
+                        MessageBoxA(NULL, "Application is in Free Mode!", OnProgramStart::Name,
                             MB_ICONINFORMATION | MB_OK);
 
-                    if (ApplicationSettings::developerMode)
+                    if (API::ApplicationSettings::developerMode) 
                     {
-                        MessageBox(NULL, L"Application is in Developer Mode, bypassing integrity and update check!", OnProgramStart::Name,
-                            MB_ICONEXCLAMATION | MB_OK);
-                        std::ofstream outfile("integrity.txt");
-                        outfile << Security::Integrity(Utilities::GetExeFileName()) << std::endl;
-                        outfile.close();
-                        MessageBox(NULL, L"Your applications hash has been saved to integrity.txt, please refer to this when your application is ready for release!",
-                            OnProgramStart::Name, MB_ICONINFORMATION | MB_OK);
+                        MessageBoxA(NULL, "Application is in Developer Mode, bypassing integrity and update check!", OnProgramStart::Name, MB_OK | MB_ICONWARNING);
+                   
+                        // Get the full path of the current executable
+                        WCHAR buffer[MAX_PATH];
+                        GetModuleFileName(NULL, buffer, MAX_PATH);
+                        // Convert the wide character string to a regular string
+                        char fullPath[MAX_PATH];
+                        wcstombs(fullPath, buffer, MAX_PATH);
+                        // Get the directory path of the current file
+                        string dirPath = string(fullPath);
+                        dirPath = dirPath.substr(0, dirPath.find_last_of("\\/"));
+
+                        ofstream integrity_log("integrity.txt");
+                        if (integrity_log.is_open()) {
+                            std::string hash = Security::Integrity(fullPath);
+                            integrity_log << hash << endl;
+                            integrity_log.close();
+                            MessageBoxA(NULL, "Your application's hash has been saved to integrity.txt, please refer to this when your application is ready for release!", OnProgramStart::Name, MB_OK | MB_ICONINFORMATION);
+                        }
                     }
                     else
                     {
                         if (ApplicationSettings::version != version)
                         {
-                            MessageBox(NULL, L"Update is available, redirecting to update!", OnProgramStart::Name,
+                            MessageBoxA(NULL, "Update is available, redirecting to update!", OnProgramStart::Name,
                                 MB_ICONERROR | MB_OK);
                             system(std::string("start " + ApplicationSettings::downloadLink).c_str());
                             exit(0);
                         }
                         if (ApplicationSettings::integrityCheck)
                         {
-                            if (ApplicationSettings::programHash != Security::Integrity(Utilities::GetExeFileName()))
+                            // Get the full path of the current executable
+                            WCHAR buffer[MAX_PATH];
+                            GetModuleFileName(NULL, buffer, MAX_PATH);
+                            // Convert the wide character string to a regular string
+                            char fullPath[MAX_PATH];
+                            wcstombs(fullPath, buffer, MAX_PATH);
+                            // Get the directory path of the current file
+                            string dirPath = string(fullPath);
+                            dirPath = dirPath.substr(0, dirPath.find_last_of("\\/"));
+
+                            if (ApplicationSettings::programHash != Security::Integrity(fullPath))
                             {
-                                MessageBox(NULL, L"File has been tampered with, couldn't verify integrity!", OnProgramStart::Name,
+                                MessageBoxA(NULL, "File has been tampered with, couldn't verify integrity!", OnProgramStart::Name,
                                     MB_ICONERROR | MB_OK);
                                 exit(0);
                             }
@@ -256,7 +301,7 @@ namespace API
                     }
                     if (ApplicationSettings::status == false)
                     {
-                        MessageBox(NULL, L"Looks like this application is disabled, please try again later!", OnProgramStart::Name,
+                        MessageBoxA(NULL, "Looks like this application is disabled, please try again later!", OnProgramStart::Name,
                             MB_ICONERROR | MB_OK);
                         exit(0);
                     }
@@ -266,17 +311,17 @@ namespace API
                     content = json::json::parse(response.text);
                     if (response.status_code == 0)
                     {
-                        MessageBox(NULL, L"Unable to connect to the remote server!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                        MessageBoxA(NULL, "Unable to connect to the remote server!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                         exit(0);
                     }
                     if (Utilities::removeQuotesFromString(to_string(content["code"])) == "NOT_FOUND")
                     {
-                        MessageBox(NULL, L"Application does not exist!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                        MessageBoxA(NULL, "Application does not exist!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                         exit(0);
                     }
                     else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "VALIDATION_FAILED")
                     {
-                        MessageBox(NULL, L"Failed to initialize your application correctly!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                        MessageBoxA(NULL, "Failed to initialize your application correctly!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                         exit(0);
                     }
                 }
@@ -284,7 +329,7 @@ namespace API
             }
             catch (const std::exception& ex)
             {
-                MessageBox(NULL, L"Unkown error, contact support!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                MessageBoxA(NULL, "Unkown error, contact support!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                 std::cout << ex.what() << std::endl;
             }
         }
@@ -294,13 +339,13 @@ namespace API
     {
         if (!Constants::initialized)
         {
-            MessageBox(NULL, L"Please initialize your application first!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+            MessageBoxA(NULL, "Please initialize your application first!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
             return false;
         }
         try
         {
             Security::Start();
-            Constants::timeSent = std::chrono::system_clock::now();
+            Constants::timeSent = time(NULL);
             json::json UserLoginDetails;
             UserLoginDetails["username"] = username;
             UserLoginDetails["password"] = password;
@@ -313,12 +358,12 @@ namespace API
 
             if (Security::MaliciousCheck(Constants::timeSent))
             {
-                MessageBox(NULL, L"Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
                 exit(0);
             }
             if (Constants::breached)
             {
-                MessageBox(NULL, L"Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
                 exit(0);
             }
 
@@ -341,31 +386,31 @@ namespace API
                 content = json::json::parse(response.text);
                 if (response.status_code == 0)
                 {
-                    MessageBox(NULL, L"Unable to connect to the remote server!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    MessageBoxA(NULL, "Unable to connect to the remote server!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                     Security::End();
                     return false;
                 }
                 if (Utilities::removeQuotesFromString(to_string(content["code"])) == "NOT_FOUND")
                 {
-                    MessageBox(NULL, L"The given username does not exist!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    MessageBoxA(NULL, "The given username does not exist!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                 }
                 else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "VALIDATION_FAILED")
                 {
-                    MessageBox(NULL, L"Missing user login information!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    MessageBoxA(NULL, "Missing user login information!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                 }
                 else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "UNAUTHORIZED")
                 {
                     if (Utilities::removeQuotesFromString(to_string(content["message"])) == "The given username and password do not match!")
                     {
-                        MessageBox(NULL, L"The given username and password do not match!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                        MessageBoxA(NULL, "The given username and password do not match!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                     }
                     else if (Utilities::removeQuotesFromString(to_string(content["message"])) == "Your subscription has expired!")
                     {
-                        MessageBox(NULL, L"Your subscription has expired!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                        MessageBoxA(NULL, "Your subscription has expired!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                     }
                     else if (Utilities::removeQuotesFromString(to_string(content["message"])) == "Your HWID does not match!")
                     {
-                        MessageBox(NULL, L"Your HWID does not match!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                        MessageBoxA(NULL, "Your HWID does not match!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                     }
                 }
                 Security::End();
@@ -374,7 +419,7 @@ namespace API
         }
         catch (const std::exception& ex)
         {
-            MessageBox(NULL, L"Unkown error, contact support!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+            MessageBoxA(NULL, "Unkown error, contact support!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
             std::cout << ex.what() << std::endl;
             Security::End();
             return false;
@@ -385,13 +430,13 @@ namespace API
     {
         if (!Constants::initialized)
         {
-            MessageBox(NULL, L"Please initialize your application first!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+            MessageBoxA(NULL, "Please initialize your application first!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
             return false;
         }
         try
         {
             Security::Start();
-            Constants::timeSent = std::chrono::system_clock::now();
+            Constants::timeSent = time(NULL);
             json::json UserRegisterDetails;
             UserRegisterDetails["username"] = username;
             UserRegisterDetails["password"] = password;
@@ -407,12 +452,12 @@ namespace API
 
             if (Security::MaliciousCheck(Constants::timeSent))
             {
-                MessageBox(NULL, L"Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
                 exit(0);
             }
             if (Constants::breached)
             {
-                MessageBox(NULL, L"Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
                 exit(0);
             }
 
@@ -435,25 +480,25 @@ namespace API
                 content = json::json::parse(response.text);
                 if (response.status_code == 0)
                 {
-                    MessageBox(NULL, L"Unable to connect to the remote server!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    MessageBoxA(NULL, "Unable to connect to the remote server!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                     Security::End();
                     return false;
                 }
                 if (Utilities::removeQuotesFromString(to_string(content["code"])) == "NOT_FOUND")
                 {
-                    MessageBox(NULL, L"License does not exist or already used!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    MessageBoxA(NULL, "License does not exist or already used!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                 }
                 else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "ER_DUP_ENTRY")
                 {
-                    MessageBox(NULL, L"User with this username already exists!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    MessageBoxA(NULL, "User with this username already exists!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                 }
                 else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "FORBIDDEN")
                 {
-                    MessageBox(NULL, L"User with this username already exists!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    MessageBoxA(NULL, "User with this username already exists!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                 }
                 else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "VALIDATION_FAILED")
                 {
-                    MessageBox(NULL, L"Missing user register information!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    MessageBoxA(NULL, "Missing user register information!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                 }
                 Security::End();
                 return false;
@@ -461,7 +506,7 @@ namespace API
         }
         catch (const std::exception& ex)
         {
-            MessageBox(NULL, L"Unkown error, contact support!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+            MessageBoxA(NULL, "Unkown error, contact support!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
             std::cout << ex.what() << std::endl;
             Security::End();
             return false;
@@ -472,13 +517,13 @@ namespace API
     {
         if (!Constants::initialized)
         {
-            MessageBox(NULL, L"Please initialize your application first!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+            MessageBoxA(NULL, "Please initialize your application first!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
             return false;
         }
         try
         {
             Security::Start();
-            Constants::timeSent = std::chrono::system_clock::now();
+            Constants::timeSent = time(NULL);
             json::json UserExtendDetails;
             UserExtendDetails["username"] = username;
             UserExtendDetails["password"] = password;
@@ -491,12 +536,12 @@ namespace API
 
             if (Security::MaliciousCheck(Constants::timeSent))
             {
-                MessageBox(NULL, L"Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
                 exit(0);
             }
             if (Constants::breached)
             {
-                MessageBox(NULL, L"Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
                 exit(0);
             }
 
@@ -519,7 +564,7 @@ namespace API
                 content = json::json::parse(response.text);
                 if (response.status_code == 0)
                 {
-                    MessageBox(NULL, L"Unable to connect to the remote server!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    MessageBoxA(NULL, "Unable to connect to the remote server!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                     Security::End();
                     return false;
                 }
@@ -527,27 +572,27 @@ namespace API
                 {
                     if (Utilities::removeQuotesFromString(to_string(content["message"])) == "The given username does not exist!")
                     {
-                        MessageBox(NULL, L"The given username does not exist!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                        MessageBoxA(NULL, "The given username does not exist!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                     }
                     else if (Utilities::removeQuotesFromString(to_string(content["message"])) == "License does not exist or already used!")
                     {
-                        MessageBox(NULL, L"License does not exist or already used!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                        MessageBoxA(NULL, "License does not exist or already used!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                     }
                 }
                 else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "UNAUTHORIZED")
                 {
                     if (Utilities::removeQuotesFromString(to_string(content["message"])) == "The given username and password do not match!")
                     {
-                        MessageBox(NULL, L"The given username and password do not match!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                        MessageBoxA(NULL, "The given username and password do not match!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                     }
                     else if (Utilities::removeQuotesFromString(to_string(content["message"])) == "Your HWID does not match!")
                     {
-                        MessageBox(NULL, L"Your HWID does not match!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                        MessageBoxA(NULL, "Your HWID does not match!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                     }
                 }
                 else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "VALIDATION_FAILED")
                 {
-                    MessageBox(NULL, L"Missing user information!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    MessageBoxA(NULL, "Missing user information!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                 }
                 Security::End();
                 return false;
@@ -555,7 +600,7 @@ namespace API
         }
         catch (const std::exception& ex)
         {
-            MessageBox(NULL, L"Unkown error, contact support!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+            MessageBoxA(NULL, "Unkown error, contact support!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
             std::cout << ex.what() << std::endl;
             Security::End();
             return false;
