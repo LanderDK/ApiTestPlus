@@ -3,7 +3,7 @@
 #include "api.h"
 
 int main()
-{
+{   
     API::OnProgramStart::Initialize("APP NAME", "SECRET", "VERSION");
 
     std::string option, username, password, email;
@@ -26,6 +26,7 @@ int main()
         if (API::Login(username, password))
         {
             MessageBoxA(NULL, "Successfully Logged In!", API::OnProgramStart::Name, MB_ICONINFORMATION | MB_OK);
+            API::Log(API::User::Username, "User logged in");
             system("CLS");
             std::cout << "\nID: " + API::User::ID << std::endl;
             std::cout << "Username: " + API::User::Username << std::endl;
@@ -59,6 +60,7 @@ int main()
         if (API::Register(username, password, email, license))
         {
             MessageBoxA(NULL, "Successfully Registered!", API::OnProgramStart::Name, MB_ICONINFORMATION | MB_OK);
+            API::Log(API::User::Username, "User registered");
             //do code that you want
         }
         else
@@ -80,6 +82,7 @@ int main()
             if (API::ExtendSub(username, password, license))
             {
                 MessageBoxA(NULL, "Successfully Extended Your Subscription!", API::OnProgramStart::Name, MB_ICONINFORMATION | MB_OK);
+                API::Log(API::User::Username, "User extended");
                 //do code that you want
             }
             else

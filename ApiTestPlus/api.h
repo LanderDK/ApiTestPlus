@@ -24,6 +24,7 @@ namespace API
     namespace Constants
     {
         std::string apiUrl = "https://api.blitzware.xyz/api/";
+        //std::string apiUrl = "http://localhost:9000/api/";
         bool initialized = false;
         bool started = false;
         bool breached = false;
@@ -606,4 +607,138 @@ namespace API
             return false;
         }
     }
+
+    static void Log(std::string username, std::string action)
+    {
+        if (!Constants::initialized)
+        {
+            MessageBoxA(NULL, "Please initialize your application first!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+            exit(0);
+        }
+        try
+        {
+            Security::Start();
+            Constants::timeSent = time(NULL);
+            json::json AppLogsDetails;
+            AppLogsDetails["username"] = username;
+            AppLogsDetails["action"] = action;
+            AppLogsDetails["ip"] = IP();
+            AppLogsDetails["appId"] = ApplicationSettings::id;
+            auto response = cpr::Post(cpr::Url{ Constants::apiUrl + "appLogs/" },
+                cpr::Body{ AppLogsDetails.dump() },
+                cpr::Header{ {"Content-Type", "application/json"} });
+            json::json content;
+
+            if (Security::MaliciousCheck(Constants::timeSent))
+            {
+                MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                exit(0);
+            }
+            if (Constants::breached)
+            {
+                MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                exit(0);
+            }
+
+            if (response.status_code == 200 || response.status_code == 201)
+            {
+                Security::End();
+            }
+            else
+            {
+                content = json::json::parse(response.text);
+                if (response.status_code == 0)
+                {
+                    MessageBoxA(NULL, "Unable to connect to the remote server!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    Security::End(); 
+                    exit(0);
+                }
+                if (Utilities::removeQuotesFromString(to_string(content["code"])) == "NOT_FOUND")
+                {
+                    MessageBoxA(NULL, "The given username does not exist!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                }
+                else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "VALIDATION_FAILED")
+                {
+                    MessageBoxA(NULL, "Missing user login information!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                }
+                else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "UNAUTHORIZED")
+                {
+                    if (Utilities::removeQuotesFromString(to_string(content["message"])) == "The given username and password do not match!")
+                    {
+                        MessageBoxA(NULL, "The given username and password do not match!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    }
+                    else if (Utilities::removeQuotesFromString(to_string(content["message"])) == "Your subscription has expired!")
+                    {
+                        MessageBoxA(NULL, "Your subscription has expired!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    }
+                    else if (Utilities::removeQuotesFromString(to_string(content["message"])) == "Your HWID does not match!")
+                    {
+                        MessageBoxA(NULL, "Your HWID does not match!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    }
+                }
+                Security::End();
+                exit(0);
+            }
+        }
+        catch (const std::exception& ex)
+        {
+            MessageBoxA(NULL, "Unkown error, contact support!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+            std::cout << ex.what() << std::endl;
+            Security::End();
+            exit(0);
+        }
+    }
 }
+
+//std::string command = "wmic diskdrive where DeviceID='\\\\.\\PHYSICALDRIVE0' get serialnumber";
+//HANDLE hPipeRead, hPipeWrite;
+//SECURITY_ATTRIBUTES saAttr = { sizeof(SECURITY_ATTRIBUTES) };
+//saAttr.bInheritHandle = TRUE;
+//saAttr.lpSecurityDescriptor = NULL;
+//
+//if (!CreatePipe(&hPipeRead, &hPipeWrite, &saAttr, 0))
+//{
+//    std::cerr << "Error: Could not create pipe" << std::endl;
+//    return 1;
+//}
+//
+//STARTUPINFOA si = { sizeof(STARTUPINFOA) };
+//si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
+//si.wShowWindow = SW_HIDE;
+//si.hStdOutput = hPipeWrite;
+//si.hStdError = hPipeWrite;
+//
+//PROCESS_INFORMATION pi;
+//if (!CreateProcessA(nullptr, const_cast<char*>(command.c_str()), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &pi))
+//{
+//    std::cerr << "Error: Could not create process" << std::endl;
+//    return 1;
+//}
+//
+//CloseHandle(hPipeWrite);
+//
+//char buffer[1024];
+//DWORD bytesRead = 0;
+//std::string output;
+//while (ReadFile(hPipeRead, buffer, sizeof(buffer), &bytesRead, nullptr))
+//{
+//    if (bytesRead == 0) break;
+//    output.append(buffer, bytesRead);
+//}
+//
+//CloseHandle(hPipeRead);
+//
+//std::string serialNumber;
+//size_t pos = output.find("\n");
+//if (pos != std::string::npos && pos < output.length() - 1)
+//{
+//    serialNumber = output.substr(pos + 1);
+//    serialNumber.erase(std::remove(serialNumber.begin(), serialNumber.end(), '.'), serialNumber.end());
+//    serialNumber.erase(0, serialNumber.find_first_not_of(" \t\n\r\f\v"));
+//    serialNumber.erase(serialNumber.find_last_not_of(" \t\n\r\f\v") + 1);
+//}
+//
+//std::cout << "Serial Number: " << serialNumber << std::endl;
+//
+//CloseHandle(pi.hThread);
+//CloseHandle(pi.hProcess);
