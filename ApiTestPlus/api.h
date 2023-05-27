@@ -352,6 +352,7 @@ namespace API
             UserLoginDetails["password"] = password;
             UserLoginDetails["hwid"] = HWID();
             UserLoginDetails["lastIP"] = IP();
+            UserLoginDetails["appId"] = ApplicationSettings::id;
             auto response = cpr::Post(cpr::Url{ Constants::apiUrl + "users/login" },
                 cpr::Body{ UserLoginDetails.dump() },
                 cpr::Header{ {"Content-Type", "application/json"} });
@@ -530,6 +531,7 @@ namespace API
             UserExtendDetails["password"] = password;
             UserExtendDetails["license"] = license;
             UserExtendDetails["hwid"] = HWID();
+            UserExtendDetails["appId"] = ApplicationSettings::id;
             auto response = cpr::Put(cpr::Url{ Constants::apiUrl + "users/upgrade" },
                 cpr::Body{ UserExtendDetails.dump() },
                 cpr::Header{ {"Content-Type", "application/json"} });
