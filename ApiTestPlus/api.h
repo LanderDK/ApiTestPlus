@@ -415,6 +415,10 @@ namespace API
                         MessageBoxA(NULL, "Your HWID does not match!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                     }
                 }
+                else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "FORBIDDEN")
+                {
+                    MessageBoxA(NULL, "Access blocked, contact support!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                }
                 Security::End();
                 return false;
             }
@@ -496,7 +500,7 @@ namespace API
                 }
                 else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "FORBIDDEN")
                 {
-                    MessageBoxA(NULL, "User with this username already exists!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    MessageBoxA(NULL, "Access blocked, contact support!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                 }
                 else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "VALIDATION_FAILED")
                 {
@@ -596,6 +600,10 @@ namespace API
                 else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "VALIDATION_FAILED")
                 {
                     MessageBoxA(NULL, "Missing user information!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                }
+                else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "FORBIDDEN")
+                {
+                    MessageBoxA(NULL, "Access blocked, contact support!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                 }
                 Security::End();
                 return false;
