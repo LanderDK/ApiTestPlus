@@ -1,6 +1,6 @@
 # ApiTestPlus
 > BlitzWare Auth C++ basic example.
-*Disclaimer: these are just very basic implementations of our api in some languages, modify it to your needs!*
+*Disclaimer: this is just very basic implementations of our api, modify it to your needs!*
 
 ## Install required packages:
 https://vcpkg.io/en/
