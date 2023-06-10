@@ -4,7 +4,7 @@
 
 int main()
 {   
-    API::OnProgramStart::Initialize("APP NAME", "SECRET", "VERSION");
+    API::OnProgramStart::Initialize("APP NAME", "SECRET", "APP VERSION");
 
     std::string option, username, password, email;
     std::string license = "N/A";
@@ -35,6 +35,7 @@ int main()
             std::cout << "HWID: " + API::User::HWID << std::endl;
             std::cout << "Last Login: " + API::User::LastLogin << std::endl;
             std::cout << "IP: " + API::User::IP << std::endl;
+            system("pause");
             //do code that you want
         }
         else
@@ -61,6 +62,7 @@ int main()
         {
             MessageBoxA(NULL, "Successfully Registered!", API::OnProgramStart::Name, MB_ICONINFORMATION | MB_OK);
             API::Log(API::User::Username, "User registered");
+            system("pause");
             //do code that you want
         }
         else
@@ -83,6 +85,7 @@ int main()
             {
                 MessageBoxA(NULL, "Successfully Extended Your Subscription!", API::OnProgramStart::Name, MB_ICONINFORMATION | MB_OK);
                 API::Log(API::User::Username, "User extended");
+                system("pause");
                 //do code that you want
             }
             else
