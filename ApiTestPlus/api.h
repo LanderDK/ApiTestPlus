@@ -118,13 +118,13 @@ namespace API
     {
         std::string ID;
         std::string Username;
-        std::string Pasword;
         std::string Email;
         std::string HWID;
         std::string IP;
         std::string Expiry;
         std::string LastLogin;
         std::string RegisterDate;
+        std::string AuthToken;
     };
 
     class Security {
@@ -372,14 +372,14 @@ namespace API
             if (response.status_code == 200 || response.status_code == 201)
             {
                 content = json::json::parse(response.text);
-                User::ID = Utilities::removeQuotesFromString(to_string(content["id"]));
-                User::Username = Utilities::removeQuotesFromString(to_string(content["username"]));
-                User::Pasword = Utilities::removeQuotesFromString(to_string(content["password"]));
-                User::Email = Utilities::removeQuotesFromString(to_string(content["email"]));
-                User::Expiry = Utilities::removeQuotesFromString(to_string(content["expiryDate"]));
-                User::LastLogin = Utilities::removeQuotesFromString(to_string(content["lastLogin"]));
-                User::IP = Utilities::removeQuotesFromString(to_string(content["lastIP"]));
-                User::HWID = Utilities::removeQuotesFromString(to_string(content["hwid"]));
+                User::ID = Utilities::removeQuotesFromString(to_string(content["user"]["id"]));
+                User::Username = Utilities::removeQuotesFromString(to_string(content["user"]["username"]));
+                User::Email = Utilities::removeQuotesFromString(to_string(content["user"]["email"]));
+                User::Expiry = Utilities::removeQuotesFromString(to_string(content["user"]["expiryDate"]));
+                User::LastLogin = Utilities::removeQuotesFromString(to_string(content["user"]["lastLogin"]));
+                User::IP = Utilities::removeQuotesFromString(to_string(content["user"]["lastIP"]));
+                User::HWID = Utilities::removeQuotesFromString(to_string(content["user"]["hwid"]));
+                User::AuthToken = Utilities::removeQuotesFromString(to_string(content["token"]));
                 Security::End();
                 return true;
             }
@@ -470,14 +470,14 @@ namespace API
             if (response.status_code == 200 || response.status_code == 201)
             {
                 content = json::json::parse(response.text);
-                User::ID = Utilities::removeQuotesFromString(to_string(content["id"]));
-                User::Username = Utilities::removeQuotesFromString(to_string(content["username"]));
-                User::Pasword = Utilities::removeQuotesFromString(to_string(content["password"]));
-                User::Email = Utilities::removeQuotesFromString(to_string(content["email"]));
-                User::Expiry = Utilities::removeQuotesFromString(to_string(content["expiryDate"]));
-                User::LastLogin = Utilities::removeQuotesFromString(to_string(content["lastLogin"]));
-                User::IP = Utilities::removeQuotesFromString(to_string(content["lastIP"]));
-                User::HWID = Utilities::removeQuotesFromString(to_string(content["hwid"]));
+                User::ID = Utilities::removeQuotesFromString(to_string(content["user"]["id"]));
+                User::Username = Utilities::removeQuotesFromString(to_string(content["user"]["username"]));
+                User::Email = Utilities::removeQuotesFromString(to_string(content["user"]["email"]));
+                User::Expiry = Utilities::removeQuotesFromString(to_string(content["user"]["expiryDate"]));
+                User::LastLogin = Utilities::removeQuotesFromString(to_string(content["user"]["lastLogin"]));
+                User::IP = Utilities::removeQuotesFromString(to_string(content["user"]["lastIP"]));
+                User::HWID = Utilities::removeQuotesFromString(to_string(content["user"]["hwid"]));
+                User::AuthToken = Utilities::removeQuotesFromString(to_string(content["token"]));
                 Security::End();
                 return true;
             }
@@ -555,14 +555,14 @@ namespace API
             if (response.status_code == 200 || response.status_code == 201)
             {
                 content = json::json::parse(response.text);
-                User::ID = Utilities::removeQuotesFromString(to_string(content["id"]));
-                User::Username = Utilities::removeQuotesFromString(to_string(content["username"]));
-                User::Pasword = Utilities::removeQuotesFromString(to_string(content["password"]));
-                User::Email = Utilities::removeQuotesFromString(to_string(content["email"]));
-                User::Expiry = Utilities::removeQuotesFromString(to_string(content["expiryDate"]));
-                User::LastLogin = Utilities::removeQuotesFromString(to_string(content["lastLogin"]));
-                User::IP = Utilities::removeQuotesFromString(to_string(content["lastIP"]));
-                User::HWID = Utilities::removeQuotesFromString(to_string(content["hwid"]));
+                User::ID = Utilities::removeQuotesFromString(to_string(content["user"]["id"]));
+                User::Username = Utilities::removeQuotesFromString(to_string(content["user"]["username"]));
+                User::Email = Utilities::removeQuotesFromString(to_string(content["user"]["email"]));
+                User::Expiry = Utilities::removeQuotesFromString(to_string(content["user"]["expiryDate"]));
+                User::LastLogin = Utilities::removeQuotesFromString(to_string(content["user"]["lastLogin"]));
+                User::IP = Utilities::removeQuotesFromString(to_string(content["user"]["lastIP"]));
+                User::HWID = Utilities::removeQuotesFromString(to_string(content["user"]["hwid"]));
+                User::AuthToken = Utilities::removeQuotesFromString(to_string(content["token"]));
                 Security::End();
                 return true;
             }
