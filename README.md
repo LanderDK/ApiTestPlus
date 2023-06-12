@@ -13,7 +13,9 @@ https://vcpkg.io/en/
 7. vcpkg install cpr
 8. vcpkg install nlohmann-json:x64-windows
 9. vcpkg install nlohmann-json
-10. vcpkg install openssl:x64-windows
-11. vcpkg install openssl
-12. vcpkg integrate install
-13. restart your IDE
+10. vcpkg install rapidjson:x64-windows
+11. vcpkg install rapidjson
+12. vcpkg install openssl:x64-windows
+13. vcpkg install openssl
+14. vcpkg integrate install
+15. restart your IDE
