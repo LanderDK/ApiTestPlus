@@ -1,5 +1,4 @@
 #pragma once
-#include <string>
 #include "utils.h"
 #include <cpr/api.h>
 #include <nlohmann/json.hpp>
@@ -12,10 +11,12 @@
 #include <Windows.h>
 #include <cstdio>
 #include <cstdlib>
-#include <iomanip>
-#include <sstream>
 #include <ctime>
 #include <openssl/md5.h>
+#include <openssl/sha.h>
+#include <string>
+#include <iomanip>
+#include <sstream>
 namespace json = nlohmann;
 using namespace std;
 
@@ -200,6 +201,24 @@ namespace API
                 return false;
             }
         }
+
+        static std::string CalculateHash(const std::string& data)
+        {
+            unsigned char hash[SHA256_DIGEST_LENGTH];
+            SHA256_CTX sha256;
+            SHA256_Init(&sha256);
+            SHA256_Update(&sha256, data.c_str(), data.length());
+            SHA256_Final(hash, &sha256);
+
+            std::stringstream ss;
+            ss << std::hex << std::setfill('0');
+            for (int i = 0; i < SHA256_DIGEST_LENGTH; i++)
+            {
+                ss << std::setw(2) << static_cast<unsigned>(hash[i]);
+            }
+
+            return ss.str();
+        }
     };
 
     namespace OnProgramStart
@@ -220,12 +239,23 @@ namespace API
                     cpr::Header{ {"Content-Type", "application/json"} });
                 json::json content;
 
+                auto receivedHash = response.header["X-Response-Hash"];
+                std::string recalculatedHash = Security::CalculateHash(response.text);
+
+                /*std::cout << "receivedHash: " << receivedHash << std::endl;
+                std::cout << "recalculatedHash: " << recalculatedHash << std::endl;*/
+
                 if (Security::MaliciousCheck(Constants::timeSent))
                 {
                     MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
                     exit(0);
                 }
                 if (Constants::breached)
+                {
+                    MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                    exit(0);
+                }
+                if (receivedHash != recalculatedHash)
                 {
                     MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
                     exit(0);
@@ -358,12 +388,23 @@ namespace API
                 cpr::Header{ {"Content-Type", "application/json"} });
             json::json content;
 
+            auto receivedHash = response.header["X-Response-Hash"];
+            std::string recalculatedHash = Security::CalculateHash(response.text);
+
+            /*std::cout << "receivedHash: " << receivedHash << std::endl;
+            std::cout << "recalculatedHash: " << recalculatedHash << std::endl;*/
+
             if (Security::MaliciousCheck(Constants::timeSent))
             {
                 MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
                 exit(0);
             }
             if (Constants::breached)
+            {
+                MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                exit(0);
+            }
+            if (receivedHash != recalculatedHash)
             {
                 MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
                 exit(0);
@@ -456,12 +497,23 @@ namespace API
                 cpr::Header{ {"Content-Type", "application/json"} });
             json::json content;
 
+            auto receivedHash = response.header["X-Response-Hash"];
+            std::string recalculatedHash = Security::CalculateHash(response.text);
+
+            /*std::cout << "receivedHash: " << receivedHash << std::endl;
+            std::cout << "recalculatedHash: " << recalculatedHash << std::endl;*/
+
             if (Security::MaliciousCheck(Constants::timeSent))
             {
                 MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
                 exit(0);
             }
             if (Constants::breached)
+            {
+                MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                exit(0);
+            }
+            if (receivedHash != recalculatedHash)
             {
                 MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
                 exit(0);
@@ -541,12 +593,23 @@ namespace API
                 cpr::Header{ {"Content-Type", "application/json"} });
             json::json content;
 
+            auto receivedHash = response.header["X-Response-Hash"];
+            std::string recalculatedHash = Security::CalculateHash(response.text);
+
+            /*std::cout << "receivedHash: " << receivedHash << std::endl;
+            std::cout << "recalculatedHash: " << recalculatedHash << std::endl;*/
+
             if (Security::MaliciousCheck(Constants::timeSent))
             {
                 MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
                 exit(0);
             }
             if (Constants::breached)
+            {
+                MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                exit(0);
+            }
+            if (receivedHash != recalculatedHash)
             {
                 MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
                 exit(0);

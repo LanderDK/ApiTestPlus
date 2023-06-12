@@ -4,7 +4,7 @@
 
 int main()
 {   
-    API::OnProgramStart::Initialize("APP NAME", "SECRET", "APP VERSION");
+    API::OnProgramStart::Initialize("APP NAME", "APP SECRET", "APP VERSION");
 
     std::string option, username, password, email;
     std::string license = "N/A";
