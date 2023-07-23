@@ -17,6 +17,9 @@
 #include <string>
 #include <iomanip>
 #include <sstream>
+#include <opencv2/opencv.hpp>
+#include <openssl/bio.h>
+#include <openssl/evp.h>
 namespace json = nlohmann;
 using namespace std;
 
@@ -97,6 +100,31 @@ namespace API
             cpr::Timeout{ 4 * 1000 }
         );
         return response.text;
+    }
+
+    std::string base64Decode(const std::string& encodedData) {
+        // Create a BIO object to perform Base64 decoding
+        BIO* bio = BIO_new(BIO_f_base64());
+        BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL);
+
+        // Create a memory buffer BIO to hold the encoded data
+        BIO* memBio = BIO_new_mem_buf(encodedData.c_str(), encodedData.length());
+
+        // Chain the memory buffer BIO to the Base64 BIO
+        bio = BIO_push(bio, memBio);
+
+        // Create a buffer to hold the decoded data
+        char buffer[4096];
+        int length = 0;
+
+        // Read the decoded data from the BIO
+        length = BIO_read(bio, buffer, sizeof(buffer));
+
+        // Clean up the BIOs
+        BIO_free_all(bio);
+
+        // Return the decoded data as a string
+        return std::string(buffer, length);
     }
 
     namespace ApplicationSettings
@@ -366,7 +394,7 @@ namespace API
         }
     };
 
-    static bool Login(std::string username, std::string password)
+    static bool Login(std::string username, std::string password, std::string twoFactorCode)
     {
         if (!Constants::initialized)
         {
@@ -380,6 +408,7 @@ namespace API
             json::json UserLoginDetails;
             UserLoginDetails["username"] = username;
             UserLoginDetails["password"] = password;
+            UserLoginDetails["twoFactorCode"] = twoFactorCode;
             UserLoginDetails["hwid"] = HWID();
             UserLoginDetails["lastIP"] = IP();
             UserLoginDetails["appId"] = ApplicationSettings::id;
@@ -699,7 +728,7 @@ namespace API
             AppLogsDetails["appId"] = ApplicationSettings::id;
             auto response = cpr::Post(cpr::Url{ Constants::apiUrl + "appLogs/" },
                 cpr::Body{ AppLogsDetails.dump() },
-                cpr::Header{ {"Content-Type", "application/json"} });
+                cpr::Header{ {"Content-Type", "application/json"}, {"Authorization", "Bearer " + User::AuthToken} });
             json::json content;
 
             if (Security::MaliciousCheck(Constants::timeSent))
@@ -748,6 +777,314 @@ namespace API
                     {
                         MessageBoxA(NULL, "Your HWID does not match!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                     }
+                }
+                Security::End();
+                exit(0);
+            }
+        }
+        catch (const std::exception& ex)
+        {
+            MessageBoxA(NULL, "Unkown error, contact support!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+            std::cout << ex.what() << std::endl;
+            Security::End();
+            exit(0);
+        }
+    }
+
+    static void CreateQRCode()
+    {
+        if (!Constants::initialized)
+        {
+            MessageBoxA(NULL, "Please initialize your application first!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+            exit(0);
+        }
+        try
+        {
+            Security::Start();
+            Constants::timeSent = time(NULL);
+            json::json QRCodeDetails;
+            QRCodeDetails["userId"] = User::ID;
+            QRCodeDetails["appId"] = ApplicationSettings::id;
+            auto response = cpr::Post(cpr::Url{ Constants::apiUrl + "2fa/user" },
+                cpr::Body{ QRCodeDetails.dump() },
+                cpr::Header{ {"Content-Type", "application/json"}, {"Authorization", "Bearer " + User::AuthToken} });
+            json::json content;
+
+            if (Security::MaliciousCheck(Constants::timeSent))
+            {
+                MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                exit(0);
+            }
+            if (Constants::breached)
+            {
+                MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                exit(0);
+            }
+
+            if (response.status_code == 200 || response.status_code == 201)
+            {
+                // Extract the Base64 encoded image data from the QR code data
+                std::string encodedImage = response.text.substr(response.text.find(',') + 1);
+
+                // Decode the Base64 data
+                std::string decodedImage = base64Decode(encodedImage);
+
+                // Create a memory buffer to hold the decoded image data
+                std::vector<unsigned char> buffer(decodedImage.begin(), decodedImage.end());
+
+                // Load the image using OpenCV
+                cv::Mat image = cv::imdecode(buffer, cv::IMREAD_UNCHANGED);
+
+                // Check if the image was loaded successfully
+                if (image.empty())
+                {
+                    std::cout << "Error: Could not decode the image!" << std::endl;
+                    exit(0);
+                }
+
+                // Display the image in a window
+                cv::imshow("Image", image);
+
+                // Wait for a key press and then close the window
+                cv::waitKey(0);
+                Security::End();
+            }
+            else
+            {
+                content = json::json::parse(response.text);
+                if (response.status_code == 0)
+                {
+                    MessageBoxA(NULL, "Unable to connect to the remote server!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    Security::End();
+                    exit(0);
+                }
+                if (Utilities::removeQuotesFromString(to_string(content["code"])) == "NOT_FOUND")
+                {
+                    if (Utilities::removeQuotesFromString(to_string(content["message"])) == "The given username does not exist!")
+                    {
+                        MessageBoxA(NULL, "The given username does not exist!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    }
+                    else if (Utilities::removeQuotesFromString(to_string(content["message"])) == "License does not exist or already used!")
+                    {
+                        MessageBoxA(NULL, "License does not exist or already used!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    }
+                }
+                else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "UNAUTHORIZED")
+                {
+                    if (Utilities::removeQuotesFromString(to_string(content["message"])) == "The given username and password do not match!")
+                    {
+                        MessageBoxA(NULL, "The given username and password do not match!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    }
+                    else if (Utilities::removeQuotesFromString(to_string(content["message"])) == "Your HWID does not match!")
+                    {
+                        MessageBoxA(NULL, "Your HWID does not match!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    }
+                }
+                else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "VALIDATION_FAILED")
+                {
+                    MessageBoxA(NULL, "Missing user information!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                }
+                else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "FORBIDDEN")
+                {
+                    MessageBoxA(NULL, "Access blocked, contact support!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                }
+                Security::End();
+                exit(0);
+            }
+        }
+        catch (const std::exception& ex)
+        {
+            MessageBoxA(NULL, "Unkown error, contact support!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+            std::cout << ex.what() << std::endl;
+            Security::End();
+            exit(0);
+        }
+    }
+
+    static void Verify2FA(std::string code)
+    {
+        if (!Constants::initialized)
+        {
+            MessageBoxA(NULL, "Please initialize your application first!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+            exit(0);
+        }
+        try
+        {
+            Security::Start();
+            Constants::timeSent = time(NULL);
+            json::json Verify2FADetails;
+            Verify2FADetails["userId"] = User::ID;
+            Verify2FADetails["appId"] = ApplicationSettings::id;
+            Verify2FADetails["token"] = code;
+            auto response = cpr::Post(cpr::Url{ Constants::apiUrl + "2fa/user/verify" },
+                cpr::Body{ Verify2FADetails.dump() },
+                cpr::Header{ {"Content-Type", "application/json"}, {"Authorization", "Bearer " + User::AuthToken} });
+            json::json content;
+
+            auto receivedHash = response.header["X-Response-Hash"];
+            std::string recalculatedHash = Security::CalculateHash(response.text);
+
+            /*std::cout << "receivedHash: " << receivedHash << std::endl;
+            std::cout << "recalculatedHash: " << recalculatedHash << std::endl;*/
+
+            if (Security::MaliciousCheck(Constants::timeSent))
+            {
+                MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                exit(0);
+            }
+            if (Constants::breached)
+            {
+                MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                exit(0);
+            }
+            if (receivedHash != recalculatedHash)
+            {
+                MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                exit(0);
+            }
+
+            if (response.status_code == 200 || response.status_code == 201)
+            {
+                std::cout << "2FA has been enabled!" << std::endl;
+                Security::End();
+            }
+            else
+            {
+                content = json::json::parse(response.text);
+                if (response.status_code == 0)
+                {
+                    MessageBoxA(NULL, "Unable to connect to the remote server!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    Security::End();
+                    exit(0);
+                }
+                if (Utilities::removeQuotesFromString(to_string(content["code"])) == "NOT_FOUND")
+                {
+                    if (Utilities::removeQuotesFromString(to_string(content["message"])) == "The given username does not exist!")
+                    {
+                        MessageBoxA(NULL, "The given username does not exist!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    }
+                    else if (Utilities::removeQuotesFromString(to_string(content["message"])) == "License does not exist or already used!")
+                    {
+                        MessageBoxA(NULL, "License does not exist or already used!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    }
+                }
+                else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "UNAUTHORIZED")
+                {
+                    if (Utilities::removeQuotesFromString(to_string(content["message"])) == "The given username and password do not match!")
+                    {
+                        MessageBoxA(NULL, "The given username and password do not match!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    }
+                    else if (Utilities::removeQuotesFromString(to_string(content["message"])) == "Your HWID does not match!")
+                    {
+                        MessageBoxA(NULL, "Your HWID does not match!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    }
+                }
+                else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "VALIDATION_FAILED")
+                {
+                    MessageBoxA(NULL, "Missing user information!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                }
+                else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "FORBIDDEN")
+                {
+                    MessageBoxA(NULL, "Access blocked, contact support!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                }
+                Security::End();
+                exit(0);
+            }
+        }
+        catch (const std::exception& ex)
+        {
+            MessageBoxA(NULL, "Unkown error, contact support!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+            std::cout << ex.what() << std::endl;
+            Security::End();
+            exit(0);
+        }
+    }
+
+    static void Disable2FA(std::string code)
+    {
+        if (!Constants::initialized)
+        {
+            MessageBoxA(NULL, "Please initialize your application first!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+            exit(0);
+        }
+        try
+        {
+            Security::Start();
+            Constants::timeSent = time(NULL);
+            json::json Verify2FADetails;
+            Verify2FADetails["userId"] = User::ID;
+            Verify2FADetails["appId"] = ApplicationSettings::id;
+            Verify2FADetails["token"] = code;
+            auto response = cpr::Post(cpr::Url{ Constants::apiUrl + "2fa/user/disable" },
+                cpr::Body{ Verify2FADetails.dump() },
+                cpr::Header{ {"Content-Type", "application/json"}, {"Authorization", "Bearer " + User::AuthToken} });
+            json::json content;
+
+            auto receivedHash = response.header["X-Response-Hash"];
+            std::string recalculatedHash = Security::CalculateHash(response.text);
+
+            /*std::cout << "receivedHash: " << receivedHash << std::endl;
+            std::cout << "recalculatedHash: " << recalculatedHash << std::endl;*/
+
+            if (Security::MaliciousCheck(Constants::timeSent))
+            {
+                MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                exit(0);
+            }
+            if (Constants::breached)
+            {
+                MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                exit(0);
+            }
+            if (receivedHash != recalculatedHash)
+            {
+                MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                exit(0);
+            }
+
+            if (response.status_code == 200 || response.status_code == 201)
+            {
+                std::cout << "2FA has been disabled!" << std::endl;
+                Security::End();
+            }
+            else
+            {
+                content = json::json::parse(response.text);
+                if (response.status_code == 0)
+                {
+                    MessageBoxA(NULL, "Unable to connect to the remote server!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    Security::End();
+                    exit(0);
+                }
+                if (Utilities::removeQuotesFromString(to_string(content["code"])) == "NOT_FOUND")
+                {
+                    if (Utilities::removeQuotesFromString(to_string(content["message"])) == "The given username does not exist!")
+                    {
+                        MessageBoxA(NULL, "The given username does not exist!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    }
+                    else if (Utilities::removeQuotesFromString(to_string(content["message"])) == "License does not exist or already used!")
+                    {
+                        MessageBoxA(NULL, "License does not exist or already used!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    }
+                }
+                else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "UNAUTHORIZED")
+                {
+                    if (Utilities::removeQuotesFromString(to_string(content["message"])) == "The given username and password do not match!")
+                    {
+                        MessageBoxA(NULL, "The given username and password do not match!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    }
+                    else if (Utilities::removeQuotesFromString(to_string(content["message"])) == "Your HWID does not match!")
+                    {
+                        MessageBoxA(NULL, "Your HWID does not match!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    }
+                }
+                else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "VALIDATION_FAILED")
+                {
+                    MessageBoxA(NULL, "Missing user information!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                }
+                else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "FORBIDDEN")
+                {
+                    MessageBoxA(NULL, "Access blocked, contact support!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
                 }
                 Security::End();
                 exit(0);

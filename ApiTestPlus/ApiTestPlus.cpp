@@ -6,7 +6,7 @@ int main()
 {   
     API::OnProgramStart::Initialize("APP NAME", "APP SECRET", "APP VERSION");
 
-    std::string option, username, password, email;
+    std::string option, username, password, email, twoFactorCode;
     std::string license = "N/A";
 
     std::cout << "\n[1] Login" << std::endl;
@@ -23,7 +23,9 @@ int main()
         std::cin >> username;
         std::cout << "\nPassword: ";
         std::cin >> password;
-        if (API::Login(username, password))
+        std::cout << "\n2FA code (if enabled): ";
+        std::cin >> twoFactorCode;
+        if (API::Login(username, password, twoFactorCode))
         {
             MessageBoxA(NULL, "Successfully Logged In!", API::OnProgramStart::Name, MB_ICONINFORMATION | MB_OK);
             API::Log(API::User::Username, "User logged in");
@@ -35,8 +37,24 @@ int main()
             std::cout << "HWID: " + API::User::HWID << std::endl;
             std::cout << "Last Login: " + API::User::LastLogin << std::endl;
             std::cout << "IP: " + API::User::IP << std::endl;
-            system("pause");
             //do code that you want
+            std::cout << "\nPress 1 to enable 2FA, press 2 to disable 2FA:";
+            std::cin >> option;
+            if (option == "1")
+            {
+                API::CreateQRCode();
+                std::cout << "QR Code:";
+                std::cin >> twoFactorCode;
+                API::Verify2FA(twoFactorCode);
+                system("pause");
+            }
+            else if (option == "2")
+            {
+                std::cout << "QR Code:";
+                std::cin >> twoFactorCode;
+                API::Disable2FA(twoFactorCode);
+                system("pause");
+            }
         }
         else
         {
