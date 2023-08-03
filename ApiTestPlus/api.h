@@ -502,6 +502,112 @@ namespace API
         }
     }
 
+    static bool LoginLicenseOnly(std::string license)
+    {
+        if (!Constants::initialized)
+        {
+            MessageBoxA(NULL, "Please initialize your application first!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+            return false;
+        }
+        try
+        {
+            Security::Start();
+            Constants::timeSent = time(NULL);
+            json::json UserLoginDetails;
+            UserLoginDetails["license"] = license;
+            UserLoginDetails["hwid"] = HWID();
+            UserLoginDetails["lastIP"] = IP();
+            UserLoginDetails["appId"] = ApplicationSettings::id;
+            auto response = cpr::Post(cpr::Url{ Constants::apiUrl + "licenses/login" },
+                cpr::Body{ UserLoginDetails.dump() },
+                cpr::Header{ {"Content-Type", "application/json"} });
+            json::json content;
+
+            auto receivedHash = response.header["X-Response-Hash"];
+            std::string recalculatedHash = Security::CalculateHash(response.text);
+
+            /*std::cout << "receivedHash: " << receivedHash << std::endl;
+            std::cout << "recalculatedHash: " << recalculatedHash << std::endl;*/
+
+            if (Security::MaliciousCheck(Constants::timeSent))
+            {
+                MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                exit(0);
+            }
+            if (Constants::breached)
+            {
+                MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                exit(0);
+            }
+            if (receivedHash != recalculatedHash)
+            {
+                MessageBoxA(NULL, "Possible malicious activity detected!", OnProgramStart::Name, MB_ICONEXCLAMATION | MB_OK);
+                exit(0);
+            }
+
+            if (response.status_code == 200 || response.status_code == 201)
+            {
+                content = json::json::parse(response.text);
+                User::ID = Utilities::removeQuotesFromString(to_string(content["user"]["id"]));
+                User::Username = Utilities::removeQuotesFromString(to_string(content["user"]["username"]));
+                User::Email = Utilities::removeQuotesFromString(to_string(content["user"]["email"]));
+                User::Expiry = Utilities::removeQuotesFromString(to_string(content["user"]["expiryDate"]));
+                User::LastLogin = Utilities::removeQuotesFromString(to_string(content["user"]["lastLogin"]));
+                User::IP = Utilities::removeQuotesFromString(to_string(content["user"]["lastIP"]));
+                User::HWID = Utilities::removeQuotesFromString(to_string(content["user"]["hwid"]));
+                User::AuthToken = Utilities::removeQuotesFromString(to_string(content["token"]));
+                Security::End();
+                return true;
+            }
+            else
+            {
+                content = json::json::parse(response.text);
+                if (response.status_code == 0)
+                {
+                    MessageBoxA(NULL, "Unable to connect to the remote server!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    Security::End();
+                    return false;
+                }
+                if (Utilities::removeQuotesFromString(to_string(content["code"])) == "NOT_FOUND")
+                {
+                    MessageBoxA(NULL, "License does not exist or already used!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                }
+                else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "VALIDATION_FAILED")
+                {
+                    MessageBoxA(NULL, "Missing user login information!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                }
+                else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "UNAUTHORIZED")
+                {
+                    if (Utilities::removeQuotesFromString(to_string(content["message"])) == "Your HWID has been reset, please login again!")
+                    {
+                        MessageBoxA(NULL, "Your HWID has been reset, please login again!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    }
+                    else if (Utilities::removeQuotesFromString(to_string(content["message"])) == "Your subscription has expired!")
+                    {
+                        MessageBoxA(NULL, "Your subscription has expired!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    }
+                    else if (Utilities::removeQuotesFromString(to_string(content["message"])) == "Your HWID does not match!")
+                    {
+                        MessageBoxA(NULL, "Your HWID does not match!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                    }
+                }
+                else if (Utilities::removeQuotesFromString(to_string(content["code"])) == "FORBIDDEN")
+                {
+                    MessageBoxA(NULL, "Access blocked, contact support!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+                }
+                Security::End();
+                return false;
+            }
+        }
+        catch (const std::exception& ex)
+        {
+            MessageBoxA(NULL, "Unkown error, contact support!", OnProgramStart::Name, MB_ICONERROR | MB_OK);
+            std::cout << ex.what() << std::endl;
+            Security::End();
+            return false;
+        }
+    }
+
     static bool Register(std::string username, std::string password, std::string email, std::string license)
     {
         if (!Constants::initialized)

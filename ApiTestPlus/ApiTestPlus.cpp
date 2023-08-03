@@ -10,9 +10,10 @@ int main()
     std::string license = "N/A";
 
     std::cout << "\n[1] Login" << std::endl;
-    std::cout << "[2] Register" << std::endl;
+    std::cout << "[2] Login (license only)" << std::endl;
+    std::cout << "[3] Register" << std::endl;
     if (!API::ApplicationSettings::freeMode)
-        std::cout << "[3] Extend Subscription" << std::endl;
+        std::cout << "[4] Extend Subscription" << std::endl;
     std::cout << "\nOption:" << std::endl;
     std::cin >> option;
 
@@ -64,6 +65,32 @@ int main()
     else if (option == "2")
     {
         system("CLS");
+        std::cout << "\License: ";
+        std::cin >> license;
+
+        if (API::LoginLicenseOnly(license))
+        {
+            MessageBoxA(NULL, "Successfully Logged In!", API::OnProgramStart::Name, MB_ICONINFORMATION | MB_OK);
+            API::Log(API::User::Username, "User logged in");
+            system("CLS");
+            std::cout << "\nID: " + API::User::ID << std::endl;
+            std::cout << "Username: " + API::User::Username << std::endl;
+            std::cout << "Email: " + API::User::Email << std::endl;
+            std::cout << "Subscription Expiry: " + API::User::Expiry << std::endl;
+            std::cout << "HWID: " + API::User::HWID << std::endl;
+            std::cout << "Last Login: " + API::User::LastLogin << std::endl;
+            std::cout << "IP: " + API::User::IP << std::endl;
+            system("pause");
+            //do code that you want
+        }
+        else
+        {
+            exit(0);
+        }
+    }
+    else if (option == "3")
+    {
+        system("CLS");
         std::cout << "\nUsername: ";
         std::cin >> username;
         std::cout << "\nPassword: ";
@@ -90,7 +117,7 @@ int main()
     }
     if (!API::ApplicationSettings::freeMode)
     {
-        if (option == "3")
+        if (option == "4")
         {
             system("CLS");
             std::cout << "\nUsername: ";
